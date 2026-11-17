@@ -1,0 +1,36 @@
+{
+  "name": "qonics-upply",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@pinia/nuxt": "^1.0.3",
+    "@primeuix/themes": "^3.1.1",
+    "@tailwindcss/vite": "^4.3.5",
+    "@vueuse/core": "^15.0.0",
+    "@vueuse/nuxt": "^15.0.0",
+    "chart.js": "^4.6.1",
+    "nuxt": "^4.6.4",
+    "pinia": "^4.1.0",
+    "primeicons": "^8.0.2",
+    "primevue": "^5.0.5",
+    "tailwindcss": "^4.3.5",
+    "tailwindcss-primeui": "^0.6.1",
+    "vee-validate": "^4.15.1",
+    "vue": "^3.5.45",
+    "vue-router": "^5.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@primevue/nuxt-module": "^5.0.5",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.14"
+  }
+}
