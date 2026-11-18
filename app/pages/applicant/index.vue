@@ -26,7 +26,7 @@ const load = () => auth.user && store.fetchMine()
     <ErrorState v-if="store.error" :message="store.error" class="mb-6" @retry="load" />
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Total applications" :value="total" icon="pi pi-file" :loading="store.loading && !total" />
+      <StatCard label="Total applications" :value="total" icon="pi pi-file-pdf" :loading="store.loading && !total" />
       <StatCard label="Under review" :value="statusCounts.under_review" icon="pi pi-search" color="#2563eb" :loading="store.loading && !total" />
       <StatCard label="Shortlisted" :value="statusCounts.shortlisted" icon="pi pi-star" color="#d97706" :loading="store.loading && !total" />
       <StatCard label="Accepted" :value="statusCounts.accepted" icon="pi pi-check-circle" color="#16a34a" :loading="store.loading && !total" />

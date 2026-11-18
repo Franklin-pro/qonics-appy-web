@@ -15,7 +15,7 @@ const loadingFirst = computed(() => store.loading && !total.value)
     <ErrorState v-if="store.error" :message="store.error" class="mb-6" @retry="store.fetchAll()" />
 
     <div class="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-6">
-      <StatCard label="Total" :value="total" icon="pi pi-file" :loading="loadingFirst" />
+      <StatCard label="Total" :value="total" icon="pi pi-file-pdf" :loading="loadingFirst" />
       <StatCard label="New" :value="newCount" icon="pi pi-inbox" color="#64748b" :loading="loadingFirst" />
       <StatCard label="Under review" :value="statusCounts.under_review" icon="pi pi-search" color="#2563eb" :loading="loadingFirst" />
       <StatCard label="Shortlisted" :value="statusCounts.shortlisted" icon="pi pi-star" color="#d97706" :loading="loadingFirst" />

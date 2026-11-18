@@ -45,10 +45,49 @@ const defaultFilters = () => ({
   submittedAt: { value: null as Array<Date | null> | null, matchMode: 'dateRange' }
 })
 const filters = ref(defaultFilters())
-filters.value.global.value = props.initialSearch || null
 const globalFields = ['reference', 'applicantName', 'email', 'departmentName', 'specializationLabel']
-const hasFilters = computed(() => Object.values(filters.value).some(f => f.value && (!Array.isArray(f.value) || f.value[0])))
-const resetFilters = () => { filters.value = defaultFilters() }
+
+/**
+ * Server mode: when the page passes `v-model:query`, the filter boxes edit that object (the page sends
+ * it to the API as ?search, ?reference, ?status, ?department, ?submitted_from, ?submitted_to) and the
+ * table shows whatever comes back. Without it the table filters its own rows in the browser.
+ */
+interface ServerQuery { search: string; reference: string; status: string | null; department: string | null; submittedFrom: string; submittedTo: string }
+const query = defineModel<ServerQuery>('query')
+const serverMode = computed(() => !!query.value)
+if (!query.value) filters.value.global.value = props.initialSearch || null
+
+const searchModel = computed<string | null>({
+  get: () => (query.value ? query.value.search : filters.value.global.value),
+  set: (v) => { if (query.value) query.value.search = v ?? ''; else filters.value.global.value = v }
+})
+const departmentModel = computed<string | null>({
+  get: () => (query.value ? query.value.department : filters.value.department.value),
+  set: (v) => { if (query.value) query.value.department = v ?? null; else filters.value.department.value = v }
+})
+const statusModel = computed<string | null>({
+  get: () => (query.value ? query.value.status : filters.value.status.value),
+  set: (v) => { if (query.value) query.value.status = v ?? null; else filters.value.status.value = v as ApplicationStatus | null }
+})
+const dateModel = computed<Array<Date | null> | null>({
+  get: () => {
+    if (!query.value) return filters.value.submittedAt.value
+    const { submittedFrom, submittedTo } = query.value
+    return submittedFrom ? [new Date(`${submittedFrom}T00:00:00`), submittedTo ? new Date(`${submittedTo}T00:00:00`) : null] : null
+  },
+  set: (v) => {
+    if (!query.value) { filters.value.submittedAt.value = v; return }
+    query.value.submittedFrom = v?.[0] ? dateKey(v[0]) : ''
+    query.value.submittedTo = v?.[1] ? dateKey(v[1]) : (v?.[0] ? dateKey(v[0]) : '')
+  }
+})
+const hasFilters = computed(() => query.value
+  ? !!(query.value.search || query.value.reference || query.value.status || query.value.department || query.value.submittedFrom)
+  : Object.values(filters.value).some(f => f.value && (!Array.isArray(f.value) || f.value[0])))
+const resetFilters = () => {
+  if (query.value) Object.assign(query.value, { search: '', reference: '', status: null, department: null, submittedFrom: '', submittedTo: '' })
+  else filters.value = defaultFilters()
+}
 
 const menu = ref()
 const menuRow = ref<Row | null>(null)
@@ -85,7 +124,7 @@ const showSkeleton = computed(() => props.loading && !flatRows.value.length)
     :rows-per-page-options="[5, 10, 25, 50]"
     paginator-template="RowsPerPageDropdown FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
     current-page-report-template="{first}–{last} of {totalRecords}"
-    :global-filter-fields="globalFields"
+    :global-filter-fields="serverMode ? [] : globalFields"
     sort-field="submittedAt"
     :sort-order="-1"
     removable-sort
@@ -97,11 +136,12 @@ const showSkeleton = computed(() => props.loading && !flatRows.value.length)
       <div class="flex flex-wrap items-center gap-2">
         <IconField class="w-full sm:w-64">
           <InputIcon class="pi pi-search" />
-          <InputText v-model="filters.global.value" placeholder="Search applications" aria-label="Search applications" size="small" fluid />
+          <InputText v-model="searchModel" placeholder="Search applications" aria-label="Search applications" size="small" fluid />
         </IconField>
-        <Select v-model="filters.department.value" :options="departmentOptions" option-label="label" option-value="value" placeholder="Department" show-clear size="small" class="w-full sm:w-52" aria-label="Filter by department" />
-        <Select v-model="filters.status.value" :options="STATUS_OPTIONS" option-label="label" option-value="value" placeholder="Status" show-clear size="small" class="w-full sm:w-40" aria-label="Filter by status" />
-        <DatePicker v-model="filters.submittedAt.value" selection-mode="range" date-format="dd M yy" placeholder="Submitted between" show-button-bar show-icon icon-display="input" size="small" class="w-full sm:w-56" input-id="date-filter" aria-label="Filter by submission date" />
+        <InputText v-if="query" v-model="query.reference" placeholder="Reference" aria-label="Filter by reference" size="small" class="w-full sm:w-40" />
+        <Select v-model="departmentModel" :options="departmentOptions" option-label="label" option-value="value" placeholder="Department" show-clear size="small" class="w-full sm:w-52" aria-label="Filter by department" />
+        <Select v-model="statusModel" :options="STATUS_OPTIONS" option-label="label" option-value="value" placeholder="Status" show-clear size="small" class="w-full sm:w-40" aria-label="Filter by status" />
+        <DatePicker v-model="dateModel" selection-mode="range" date-format="dd M yy" placeholder="Submitted between" show-button-bar show-icon icon-display="input" size="small" class="w-full sm:w-56" input-id="date-filter" aria-label="Filter by submission date" />
         <Button v-if="hasFilters" label="Clear" icon="pi pi-filter-slash" severity="secondary" text size="small" @click="resetFilters" />
         <slot name="toolbar" />
       </div>
@@ -145,7 +185,7 @@ const showSkeleton = computed(() => props.loading && !flatRows.value.length)
       <EmptyState
         :title="hasFilters ? 'No applications match your filters' : 'No applications yet'"
         :message="hasFilters ? 'Try a different search or clear the filters.' : isAdmin ? 'New applications will appear here as they are submitted.' : 'Applications you submit will appear here.'"
-        icon="pi pi-file"
+        icon="pi pi-file-pdf"
       >
         <Button v-if="hasFilters" label="Clear filters" severity="secondary" outlined size="small" @click="resetFilters" />
         <LinkButton v-else-if="!isAdmin" to="/applicant/apply" label="Apply for an internship" size="small" />

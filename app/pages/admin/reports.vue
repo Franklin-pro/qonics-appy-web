@@ -57,7 +57,7 @@ function exportCsv() {
     </div>
 
     <div class="mb-4 grid gap-4 sm:grid-cols-3">
-      <StatCard label="Applications in range" :value="filtered.length" icon="pi pi-file" :loading="store.loading && !items.length" />
+      <StatCard label="Applications in range" :value="filtered.length" icon="pi pi-file-pdf" :loading="store.loading && !items.length" />
       <StatCard label="Accepted" :value="counts.accepted" icon="pi pi-check-circle" color="#16a34a" :loading="store.loading && !items.length" />
       <StatCard label="Acceptance rate (decided)" :value="acceptRate === null ? '—' : `${acceptRate}%`" icon="pi pi-percentage" color="#06b6d4" :loading="store.loading && !items.length" />
     </div>

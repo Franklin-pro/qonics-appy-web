@@ -73,3 +73,11 @@ export function rows(data: unknown, key: string): Raw[] {
   const inner = (data as Raw | null | undefined)?.[key]
   return Array.isArray(inner) ? inner : []
 }
+
+/** Total number of matching rows when a paged response reports one (`total`, or inside `pagination` / `meta`). */
+export function totalOf(data: unknown): number | undefined {
+  if (Array.isArray(data) || !data || typeof data !== 'object') return undefined
+  const d = data as Raw
+  const n = d.total ?? d.total_count ?? d.pagination?.total ?? d.meta?.total
+  return typeof n === 'number' ? n : undefined
+}

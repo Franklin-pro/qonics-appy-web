@@ -74,7 +74,7 @@ watch(() => props.modelValue, v => { if (!v) release() })
       <template #content="{ files, removeFileCallback }">
         <ul v-if="files.length" class="space-y-3">
           <li v-for="(file, i) in files" :key="file.name + file.size" class="flex items-center gap-3">
-            <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-100 text-brand"><i class="pi pi-file" aria-hidden="true" /></span>
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-100 text-brand"><i class="pi pi-file-pdf" aria-hidden="true" /></span>
             <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-medium text-ink">{{ file.name }}</p>
               <p class="text-xs text-muted">{{ formatBytes(file.size) }} · {{ progress < 100 ? `Preparing ${progress}%` : 'Ready to submit' }}</p>

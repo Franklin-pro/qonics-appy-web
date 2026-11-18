@@ -20,15 +20,24 @@ async function uploadFile(type: DocumentType, file: File): Promise<{ fileId: str
   return { fileId: slot.file_id, file }
 }
 
+export interface ApplicationQuery { search?: string; reference?: string; status?: string; department?: string; submittedFrom?: string; submittedTo?: string }
+
 export const applicationService = {
   /** Applicant: their own applications. */
   async listMine(): Promise<Application[]> {
     return rows(await api('/applications/mine'), 'applications').map(toApplication)
   },
 
-  /** Admin: every application. */
-  async listAll(): Promise<Application[]> {
-    return rows(await api('/applications'), 'applications').map(toApplication)
+  /** Admin: applications, filtered by the server (`search`, `reference`, `status`, `department`, `submitted_from`, `submitted_to`). */
+  async listAll(params: ApplicationQuery = {}): Promise<Application[]> {
+    const query: Record<string, string> = {}
+    if (params.search?.trim()) query.search = params.search.trim()
+    if (params.reference?.trim()) query.reference = params.reference.trim()
+    if (params.status) query.status = params.status
+    if (params.department) query.department = params.department
+    if (params.submittedFrom) query.submitted_from = params.submittedFrom
+    if (params.submittedTo) query.submitted_to = params.submittedTo
+    return rows(await api('/applications', { query }), 'applications').map(toApplication)
   },
 
   async get(id: string): Promise<Application> {

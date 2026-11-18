@@ -61,7 +61,7 @@ onMounted(loadAvailability)
 function pickSuggestion(s: { date: Date; session: SessionId }) { startDate.value = s.date; session.value = s.session }
 const weekendDays = [0, 6]
 
-const durationOptions = [3, 4, 6].map(m => ({ label: `${m} months`, value: m }))
+const durationOptions = [1,2,3, 4,5, 6].map(m => ({ label: `${m} months`, value: m }))
 const modeOptions: Array<{ label: string; value: WorkMode }> = [
   { label: 'On-site', value: 'onsite' }, { label: 'Remote', value: 'remote' }, { label: 'Hybrid', value: 'hybrid' }
 ]

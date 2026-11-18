@@ -23,7 +23,7 @@ async function open(doc: ApplicationDocument) {
   <ul v-if="documents.length" class="divide-y divide-line">
     <li v-for="doc in documents" :key="doc.id" class="flex items-center gap-3 py-3">
       <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-100 text-brand">
-        <i class="pi pi-file-pdf" aria-hidden="true" />
+        <i class="pi pi-file-pdf-pdf" aria-hidden="true" />
       </span>
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-medium text-ink">{{ doc.name }}</p>

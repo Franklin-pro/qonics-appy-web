@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import type { Application, DocumentType, NewApplicationPayload, StatusUpdatePayload } from '~/types/application'
 import type { ApplicantSummary } from '~/types/user'
 import type { Booking } from '~/utils/sessions'
-import { applicationService } from '~/services/applicationService'
-import { applicantService } from '~/services/applicantService'
+import { applicationService, type ApplicationQuery } from '~/services/applicationService'
+import { applicantService, type ApplicantQuery } from '~/services/applicantService'
 
 export const useApplicationsStore = defineStore('applications', () => {
   const items = ref<Application[]>([])
@@ -24,8 +24,13 @@ export const useApplicationsStore = defineStore('applications', () => {
   }
 
   const fetchMine = () => run(async () => { items.value = await applicationService.listMine() })
-  const fetchAll = () => run(async () => { items.value = await applicationService.listAll() })
-  const fetchApplicants = () => run(async () => { applicants.value = await applicantService.listApplicants() })
+  const fetchAll = (query: ApplicationQuery = {}) => run(async () => { items.value = await applicationService.listAll(query) })
+  const applicantsTotal = ref(0)
+  const fetchApplicants = (query: ApplicantQuery = {}) => run(async () => {
+    const res = await applicantService.listApplicants(query)
+    applicants.value = res.items
+    applicantsTotal.value = res.total
+  })
 
   function upsert(app: Application) {
     const i = items.value.findIndex(a => a.id === app.id)
@@ -58,5 +63,5 @@ export const useApplicationsStore = defineStore('applications', () => {
 
   const byId = (id: string) => items.value.find(a => a.id === id)
 
-  return { items, applicants, loading, error, fetchMine, fetchAll, fetchApplicants, fetchOne, availability, fetchAvailability, create, updateStatus, addNote, byId }
+  return { items, applicants, applicantsTotal, loading, error, fetchMine, fetchAll, fetchApplicants, fetchOne, availability, fetchAvailability, create, updateStatus, addNote, byId }
 })
