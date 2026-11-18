@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
 import { z } from 'zod'
-import type { DocumentType, WorkMode, Application, ApplicationDocument, SessionId } from '~/types/application'
+import type { DocumentType, WorkMode, Application, SessionId } from '~/types/application'
 import type { DepartmentId } from '~/types/department'
 import { useApplicationsStore } from '~/stores/applications'
 import { useAuthStore } from '~/stores/auth'
@@ -107,12 +107,8 @@ async function submit() {
   submitting.value = true
   submitError.value = ''
   try {
-    const now = new Date().toISOString()
-    const documents: ApplicationDocument[] = attached.value.map(u => ({
-      id: `${u.type}-${Date.now()}`, type: u.type, name: files[u.type]!.name, size: files[u.type]!.size, uploadedAt: now
-    }))
     const v = values
-    const app = await applications.create(auth.user.id, {
+    const app = await applications.create({
       department: department.value,
       specialization: specialization.value,
       motivation: v.motivation!.trim(),
@@ -121,13 +117,10 @@ async function submit() {
       educationLevel: v.educationLevel!,
       session: v.session!,
       durationMonths: v.durationMonths!,
-      workMode: v.workMode!,
-      documents
+      workMode: v.workMode!
     }, Object.fromEntries(attached.value.map(u => [u.type, files[u.type]!])))
     toast.add({
-      severity: auth.demoMode ? 'warn' : 'success',
-      summary: auth.demoMode ? 'Saved to demo data' : 'Application submitted',
-      detail: auth.demoMode ? 'No backend is connected, so nothing was sent and files were not uploaded.' : `Reference ${app.reference}`,
+      severity: 'success', summary: 'Application submitted', detail: `Reference ${app.reference}`,
       life: 6000
     })
     emit('submitted', app)
@@ -287,9 +280,6 @@ async function submit() {
             <li v-for="u in attached" :key="u.type"><i class="pi pi-check-circle mr-1.5 text-ok" aria-hidden="true" />{{ u.label }}: {{ files[u.type]!.name }}</li>
           </ul>
         </div>
-        <Message v-if="auth.demoMode" severity="warn" size="small" :closable="false" class="mt-5">
-          Demo mode: submitting saves this application to in-browser sample data only. Nothing is sent and files are not uploaded.
-        </Message>
         <Message v-if="submitError" severity="error" :closable="false" class="mt-4" role="alert">{{ submitError }}</Message>
       </StepPanel>
     </StepPanels>

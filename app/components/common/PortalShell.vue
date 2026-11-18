@@ -20,7 +20,6 @@ watch(() => route.fullPath, () => { open.value = false })
     </Drawer>
 
     <div class="min-w-0 lg:pl-64">
-      <DemoBanner />
       <header class="sticky top-0 z-20 border-b border-line bg-white/90 backdrop-blur">
         <slot name="header" :open-menu="() => (open = true)" />
       </header>

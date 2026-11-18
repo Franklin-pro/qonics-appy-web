@@ -23,7 +23,7 @@ export const useApplicationsStore = defineStore('applications', () => {
     }
   }
 
-  const fetchMine = (userId: string) => run(async () => { items.value = await applicationService.listMine(userId) })
+  const fetchMine = () => run(async () => { items.value = await applicationService.listMine() })
   const fetchAll = () => run(async () => { items.value = await applicationService.listAll() })
   const fetchApplicants = () => run(async () => { applicants.value = await applicantService.listApplicants() })
 
@@ -39,16 +39,16 @@ export const useApplicationsStore = defineStore('applications', () => {
     return upsert(app)
   }
 
-  async function create(userId: string, payload: NewApplicationPayload, files: Partial<Record<DocumentType, File>> = {}) {
-    return upsert(await applicationService.create(userId, payload, files))
+  async function create(payload: NewApplicationPayload, files: Partial<Record<DocumentType, File>> = {}) {
+    return upsert(await applicationService.create(payload, files))
   }
 
   async function updateStatus(id: string, payload: StatusUpdatePayload) {
     return upsert(await applicationService.updateStatus(id, payload))
   }
 
-  async function addNote(id: string, author: string, text: string) {
-    return upsert(await applicationService.addNote(id, author, text))
+  async function addNote(id: string, text: string) {
+    return upsert(await applicationService.addNote(id, text))
   }
 
   const availability = ref<Booking[]>([])

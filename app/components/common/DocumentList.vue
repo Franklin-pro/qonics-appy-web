@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ApplicationDocument, DocumentType } from '~/types/application'
+import { applicationService } from '~/services/applicationService'
 
 defineProps<{ documents: ApplicationDocument[] }>()
 const toast = useToast()
@@ -8,9 +9,13 @@ const LABELS: Record<DocumentType, string> = {
   cv: 'CV / Resume', transcript: 'Academic transcript', diploma: 'Diploma certificate', certificates: 'Supporting certificates', cover_letter: 'Cover letter'
 }
 
-function open(doc: ApplicationDocument) {
-  if (doc.url) window.open(doc.url, '_blank', 'noopener')
-  else toast.add({ severity: 'warn', summary: 'File not available', detail: 'No file storage is connected in demo mode.', life: 4000 })
+async function open(doc: ApplicationDocument) {
+  try {
+    const url = doc.url ?? await applicationService.fileUrl(doc.id)
+    window.open(url, '_blank', 'noopener')
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Could not open the file', detail: (e as Error).message, life: 4000 })
+  }
 }
 </script>
 

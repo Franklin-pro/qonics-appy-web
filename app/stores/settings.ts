@@ -10,9 +10,10 @@ export const useSettingsStore = defineStore('settings', () => {
   async function fetch() {
     try {
       settings.value = await applicantService.getSettings()
-      loaded.value = true
     } catch {
       // Keep the optimistic default (open) if settings cannot be read.
+    } finally {
+      loaded.value = true // pages wait on this flag, so it must be set even when the request fails
     }
   }
 

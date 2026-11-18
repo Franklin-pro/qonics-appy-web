@@ -2,14 +2,12 @@
 import { useForm } from 'vee-validate'
 import { z } from 'zod'
 import { authService } from '~/services/authService'
-import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'auth', middleware: 'guest' })
 useHead({ title: 'Reset password | Qonics Inc.' })
 
 const route = useRoute()
 const toast = useToast()
-const demo = useAuthStore().demoMode
 const token = computed(() => (typeof route.query.token === 'string' ? route.query.token : ''))
 const submitting = ref(false)
 const formError = ref('')
@@ -30,9 +28,9 @@ const submit = handleSubmit(async (v) => {
   try {
     await authService.resetPassword(token.value, v.password)
     toast.add({
-      severity: demo ? 'warn' : 'success',
-      summary: demo ? 'Demo mode: password not changed' : 'Password updated',
-      detail: demo ? 'No backend is connected.' : 'Sign in with your new password.', life: 5000
+      severity: 'success',
+      summary: 'Password updated',
+      detail: 'Sign in with your new password.', life: 5000
     })
     await navigateTo('/auth/login')
   } catch (e) {
@@ -47,7 +45,7 @@ const submit = handleSubmit(async (v) => {
   <div class="surface-card p-7">
     <h1 class="text-2xl font-bold text-navy">Set a new password</h1>
     <p class="mt-1 text-sm text-muted">Choose a strong password you have not used before.</p>
-    <Message v-if="!token && !demo" severity="error" :closable="false" class="mt-5">This reset link is missing its token. Request a new link.</Message>
+    <Message v-if="!token" severity="error" :closable="false" class="mt-5">This reset link is missing its token. Request a new link.</Message>
     <Message v-if="formError" severity="error" :closable="false" class="mt-5" role="alert">{{ formError }}</Message>
 
     <form class="mt-6 space-y-4" novalidate @submit.prevent="submit">
@@ -58,7 +56,7 @@ const submit = handleSubmit(async (v) => {
       <AppField id="confirmPassword" label="Confirm password" :error="errors.confirmPassword" required>
         <Password v-model="confirmPassword" input-id="confirmPassword" :feedback="false" toggle-mask autocomplete="new-password" :invalid="!!errors.confirmPassword" fluid />
       </AppField>
-      <Button type="submit" label="Update password" :loading="submitting" :disabled="!token && !demo" fluid />
+      <Button type="submit" label="Update password" :loading="submitting" :disabled="!token" fluid />
     </form>
     <p class="mt-6 text-center text-sm"><NuxtLink to="/auth/login" class="font-medium text-brand hover:underline">Back to sign in</NuxtLink></p>
   </div>

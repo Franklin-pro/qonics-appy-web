@@ -63,7 +63,6 @@ export interface NewApplicationPayload {
   session: SessionId
   durationMonths: number
   workMode: WorkMode
-  documents: ApplicationDocument[]
 }
 
 export interface StatusUpdatePayload {

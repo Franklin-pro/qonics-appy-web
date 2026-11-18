@@ -29,7 +29,7 @@ const submit = handleSubmit(async (v) => {
   saving.value = true
   formError.value = ''
   try {
-    await authService.changePassword(auth.user.email, v.currentPassword, v.newPassword)
+    await authService.changePassword(v.currentPassword, v.newPassword)
     toast.add({ severity: 'success', summary: 'Password updated', life: 3000 })
     resetForm()
   } catch (e) {

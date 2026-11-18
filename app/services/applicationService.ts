@@ -1,95 +1,84 @@
 import type { Application, DocumentType, NewApplicationPayload, StatusUpdatePayload } from '~/types/application'
-import { SESSION_CAPACITY, bookingsFrom, seatsFor, usesSeat, type Booking } from '~/utils/sessions'
-import { api, ApiError, isDemoMode } from './api'
-import * as db from './mock/db'
+import { SESSION_CAPACITY, usesSeat, type Booking } from '~/utils/sessions'
+import { api, ApiError } from './api'
+import { rows, toApplication } from './mappers'
 
-const STATUS_MESSAGES: Record<string, string> = {
-  under_review: 'A reviewer has started looking at your application.',
-  shortlisted: 'Your application has been shortlisted.',
-  interview: 'An interview has been scheduled for your application.',
-  accepted: 'Congratulations! Your application has been accepted.',
-  rejected: 'Your application was not successful this time.'
-}
+interface PresignedUpload { presigned_url: string; file_id: string; object_key: string }
 
-const find = (id: string) => {
-  const app = db.applications.find(a => a.id === id)
-  if (!app) throw new ApiError('Application not found.', 404)
-  return app
+/** Upload one file: presigned URL -> PUT bytes to storage. Returns what confirm-upload needs. */
+async function uploadFile(type: DocumentType, file: File): Promise<{ fileId: string; objectKey: string; file: File }> {
+  const slot = await api<PresignedUpload>('/files/presigned-url', {
+    method: 'POST', body: { file_name: file.name, file_type: type, file_size: file.size }
+  })
+  const put = await fetch(slot.presigned_url, { method: 'PUT', body: file, headers: file.type ? { 'Content-Type': file.type } : {} })
+  if (!put.ok) throw new ApiError(`Could not upload ${file.name} (storage answered ${put.status}).`, put.status)
+  return { fileId: slot.file_id, objectKey: slot.object_key, file }
 }
 
 export const applicationService = {
   /** Applicant: their own applications. */
-  async listMine(userId: string): Promise<Application[]> {
-    if (!isDemoMode()) return api<Application[]>('/applications/mine')
-    await db.delay()
-    return db.applications.filter(a => a.applicant.id === userId).map(a => structuredClone(a))
+  async listMine(): Promise<Application[]> {
+    return rows(await api('/applications/mine'), 'applications').map(toApplication)
   },
 
   /** Admin: every application. */
   async listAll(): Promise<Application[]> {
-    if (!isDemoMode()) return api<Application[]>('/applications')
-    await db.delay()
-    return db.applications.map(a => structuredClone(a))
+    return rows(await api('/applications'), 'applications').map(toApplication)
   },
 
   async get(id: string): Promise<Application> {
-    if (!isDemoMode()) return api<Application>(`/applications/${id}`)
-    await db.delay(200)
-    return structuredClone(find(id))
+    return toApplication(await api(`/applications/${id}`))
   },
 
-  /** Anonymous on-site/hybrid seat bookings (start, duration, session) across all applicants. */
+  /**
+   * Seat windows built from the signed-in user's own applications (`GET /applications/mine`):
+   * on-site/hybrid, not rejected. The server still enforces the real capacity on submit.
+   */
   async availability(): Promise<Booking[]> {
-    if (!isDemoMode()) return api<Booking[]>('/sessions/bookings')
-    await db.delay(150)
-    return bookingsFrom(db.applications)
+    const mine = await this.listMine()
+    return mine
+      .filter(a => a.startDate && a.status !== 'rejected' && usesSeat(a.workMode))
+      .map(a => {
+        const end = new Date(a.startDate!)
+        end.setMonth(end.getMonth() + a.durationMonths)
+        return { startDate: a.startDate!, endDate: end.toISOString(), session: a.session, booked: 1, capacity: SESSION_CAPACITY }
+      })
   },
 
-  /** Real mode sends multipart: a JSON `payload` field plus one file field per document type. */
-  async create(userId: string, payload: NewApplicationPayload, files: Partial<Record<DocumentType, File>> = {}): Promise<Application> {
-    if (!isDemoMode()) {
-      const form = new FormData()
-      form.append('payload', JSON.stringify(payload))
-      Object.entries(files).forEach(([type, file]) => { if (file) form.append(type, file, file.name) })
-      return api<Application>('/applications', { method: 'POST', body: form })
-    }
-    await db.delay(700)
-    if (payload.startDate && usesSeat(payload.workMode) &&
-      seatsFor(bookingsFrom(db.applications), payload.session, new Date(payload.startDate), payload.durationMonths) <= 0) {
-      throw new ApiError(`That session is full for your internship period (${SESSION_CAPACITY} on-site/hybrid students at a time). Choose the other session, a later starting date, or remote work.`, 409)
-    }
-    const profile = db.profiles.find(p => p.id === userId)
-    if (!profile) throw new ApiError('Profile not found.', 404)
-    const now = new Date().toISOString()
-    const reference = db.nextReference()
-    const app: Application = {
-      id: reference.toLowerCase(), reference, applicant: structuredClone(profile),
-      ...payload, status: 'submitted', submittedAt: now, interviewAt: null,
-      history: [{ status: 'submitted', at: now, note: 'Application received.' }], notes: []
-    }
-    db.applications.unshift(app)
-    return structuredClone(app)
+  /** Uploads each document first, creates the application with their file ids, then confirms the uploads against it. */
+  async create(payload: NewApplicationPayload, files: Partial<Record<DocumentType, File>> = {}): Promise<Application> {
+    const entries = Object.entries(files).filter((e): e is [DocumentType, File] => !!e[1])
+    const uploaded = await Promise.all(entries.map(([type, file]) => uploadFile(type, file)))
+    const created = toApplication(await api('/applications', {
+      method: 'POST',
+      body: {
+        department: payload.department, specialization: payload.specialization, motivation: payload.motivation, experience: payload.experience,
+        start_date: payload.startDate, education_level: payload.educationLevel, session: payload.session,
+        duration_months: payload.durationMonths, work_mode: payload.workMode, document_ids: uploaded.map(u => u.fileId)
+      }
+    }))
+    await Promise.all(uploaded.map(u => api('/files/confirm-upload', {
+      method: 'POST',
+      body: {
+        file_id: u.fileId, object_key: u.objectKey, source_table: 'applications', source_table_id: created.id,
+        extra: { original_name: u.file.name, mime_type: u.file.type }
+      }
+    })))
+    return created
   },
 
   async updateStatus(id: string, payload: StatusUpdatePayload): Promise<Application> {
-    if (!isDemoMode()) return api<Application>(`/applications/${id}/status`, { method: 'PATCH', body: payload })
-    await db.delay(300)
-    const app = find(id)
-    const at = new Date().toISOString()
-    app.status = payload.status
-    app.interviewAt = payload.status === 'interview' ? payload.interviewAt ?? null : app.interviewAt
-    app.history.push({ status: payload.status, at, note: payload.note })
-    if (app.applicant.id === 'u-demo' && STATUS_MESSAGES[payload.status]) {
-      db.notifications.unshift({ id: `n-${Date.now()}`, title: `Application ${payload.status.replace('_', ' ')}`, message: STATUS_MESSAGES[payload.status]!, at, read: false })
-    }
-    return structuredClone(app)
+    return toApplication(await api(`/applications/${id}/status`, {
+      method: 'PATCH', body: { status: payload.status, note: payload.note, interview_at: payload.interviewAt ?? undefined }
+    }))
   },
 
-  async addNote(id: string, author: string, text: string): Promise<Application> {
-    if (!isDemoMode()) return api<Application>(`/applications/${id}/notes`, { method: 'POST', body: { text } })
-    await db.delay(200)
-    const app = find(id)
-    app.notes.unshift({ id: `n-${Date.now()}`, author, text, at: new Date().toISOString() })
-    return structuredClone(app)
+  async addNote(id: string, text: string): Promise<Application> {
+    return toApplication(await api(`/applications/${id}/notes`, { method: 'POST', body: { text } }))
+  },
+
+  /** Short-lived download link for a confirmed file (owner or admin). */
+  async fileUrl(fileId: string): Promise<string> {
+    return (await api<{ url: string }>(`/files/${fileId}/url`)).url
   }
 }

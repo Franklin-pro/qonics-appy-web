@@ -8,11 +8,11 @@ export const useApplicantStore = defineStore('applicant', () => {
   const saving = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchProfile(userId: string) {
+  async function fetchProfile() {
     loading.value = true
     error.value = null
     try {
-      profile.value = await applicantService.getProfile(userId)
+      profile.value = await applicantService.getProfile()
     } catch (e) {
       error.value = (e as Error).message
     } finally {
@@ -20,10 +20,10 @@ export const useApplicantStore = defineStore('applicant', () => {
     }
   }
 
-  async function saveProfile(userId: string, data: ApplicantProfile) {
+  async function saveProfile(data: ApplicantProfile) {
     saving.value = true
     try {
-      profile.value = await applicantService.saveProfile(userId, data)
+      profile.value = await applicantService.saveProfile(data)
     } finally {
       saving.value = false
     }

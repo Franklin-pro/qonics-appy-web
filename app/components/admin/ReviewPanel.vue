@@ -19,7 +19,7 @@ async function addNote() {
   if (!note.value.trim()) return
   addingNote.value = true
   try {
-    await store.addNote(app.value.id, auth.user?.fullName ?? 'Admin', note.value.trim())
+    await store.addNote(app.value.id, note.value.trim())
     note.value = ''
     toast.add({ severity: 'success', summary: 'Note added', life: 2500 })
   } catch (e) {

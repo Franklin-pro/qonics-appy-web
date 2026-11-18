@@ -32,7 +32,7 @@ const submit = handleSubmit(async (v) => {
   formError.value = ''
   try {
     const user = await store.register({ fullName: v.fullName, email: v.email, phone: v.phone, password: v.password })
-    toast.add({ severity: 'success', summary: 'Account created', detail: store.demoMode ? 'Demo account, kept in this browser tab only.' : `Welcome, ${user.fullName}.`, life: 4000 })
+    toast.add({ severity: 'success', summary: 'Account created', detail: `Welcome, ${user.fullName}.`, life: 4000 })
     await navigateTo('/applicant/profile')
   } catch (e) {
     formError.value = (e as Error).message

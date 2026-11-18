@@ -6,7 +6,7 @@ useHead({ title: 'My Applications | Qonics Inc.' })
 
 const auth = useAuthStore()
 const { store, items } = useApplications()
-const load = () => auth.user && store.fetchMine(auth.user.id)
+const load = () => auth.user && store.fetchMine()
 onMounted(load)
 </script>
 

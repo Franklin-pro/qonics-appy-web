@@ -11,10 +11,10 @@ const { store, statusCounts, total, recent } = useApplications()
 
 onMounted(() => {
   if (!auth.user) return
-  store.fetchMine(auth.user.id)
-  if (!applicant.profile) applicant.fetchProfile(auth.user.id)
+  store.fetchMine()
+  if (!applicant.profile) applicant.fetchProfile()
 })
-const load = () => auth.user && store.fetchMine(auth.user.id)
+const load = () => auth.user && store.fetchMine()
 </script>
 
 <template>

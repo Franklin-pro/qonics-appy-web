@@ -15,7 +15,6 @@
       </svg>
     </aside>
     <div class="flex min-w-0 flex-col bg-canvas">
-      <DemoBanner />
       <div class="flex items-center justify-between p-5 lg:hidden"><AppLogo /></div>
       <main id="main" class="flex flex-1 items-center justify-center px-5 py-8 sm:px-10">
         <div class="w-full max-w-md"><slot /></div>

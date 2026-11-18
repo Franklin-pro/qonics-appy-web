@@ -1,4 +1,4 @@
-import type { Application, EducationLevel, SessionId, WorkMode } from '~/types/application'
+import type { EducationLevel, SessionId, WorkMode } from '~/types/application'
 
 /** Maximum on-site / hybrid students attending the same daily session at the same time. */
 export const SESSION_CAPACITY = 6
@@ -33,30 +33,26 @@ export const usesSeat = (mode: WorkMode | null | undefined) => mode !== 'remote'
  * session from their starting date until `startDate + durationMonths`. So availability depends on
  * the session (time) and on who is attending during the period, not on one calendar day.
  */
-export interface Booking { startDate: string; durationMonths: number; session: SessionId }
 
-/** Anonymous seat bookings: on-site/hybrid, not rejected. (This is what the backend should expose.) */
-export function bookingsFrom(apps: Array<Pick<Application, 'startDate' | 'durationMonths' | 'session' | 'status' | 'workMode'>>): Booking[] {
-  return apps
-    .filter(a => a.startDate && a.status !== 'rejected' && usesSeat(a.workMode))
-    .map(a => ({ startDate: a.startDate!, durationMonths: a.durationMonths, session: a.session }))
-}
+/** A seat window from `GET /sessions/bookings`: `booked` seats of one session are held from startDate to endDate. */
+export interface Booking { startDate: string; endDate: string; session: SessionId; booked: number; capacity: number }
 
 const dayStart = (d: Date | string) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 const endOf = (start: Date, months: number) => { const x = new Date(start); x.setMonth(x.getMonth() + months); return x }
-const interval = (start: Date | string, months: number) => { const s = dayStart(start); return { s: s.getTime(), e: endOf(s, months).getTime() } }
 
 /** Free seats in `session` for an internship starting `start` and lasting `months` (the worst day in the period). */
 export function seatsFor(bookings: Booking[], session: SessionId, start: Date, months: number) {
-  const mine = interval(start, months)
-  const overlapping = bookings
-    .filter(b => b.session === session)
-    .map(b => interval(b.startDate, b.durationMonths))
+  const s0 = dayStart(start)
+  const mine = { s: s0.getTime(), e: endOf(s0, months).getTime() }
+  const forSession = bookings.filter(b => b.session === session)
+  const capacity = forSession[0]?.capacity ?? SESSION_CAPACITY
+  const overlapping = forSession
+    .map(b => ({ s: dayStart(b.startDate).getTime(), e: dayStart(b.endDate).getTime(), n: b.booked }))
     .filter(b => b.s < mine.e && b.e > mine.s)
   // Concurrency only increases when another booking starts, so check the start of my period and each later start.
   const checkpoints = [mine.s, ...overlapping.filter(b => b.s > mine.s).map(b => b.s)]
-  const peak = Math.max(0, ...checkpoints.map(t => overlapping.filter(b => b.s <= t && b.e > t).length))
-  return SESSION_CAPACITY - peak
+  const peak = Math.max(0, ...checkpoints.map(t => overlapping.filter(b => b.s <= t && b.e > t).reduce((sum, b) => sum + b.n, 0)))
+  return capacity - peak
 }
 
 export interface SlotSuggestion { date: Date; session: SessionId; left: number }

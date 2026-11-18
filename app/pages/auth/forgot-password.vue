@@ -2,12 +2,10 @@
 import { useForm } from 'vee-validate'
 import { z } from 'zod'
 import { authService } from '~/services/authService'
-import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'auth', middleware: 'guest' })
 useHead({ title: 'Forgot password | Qonics Inc.' })
 
-const demo = useAuthStore().demoMode
 const submitting = ref(false)
 const sent = ref(false)
 const formError = ref('')
@@ -37,8 +35,7 @@ const submit = handleSubmit(async (v) => {
     <h1 class="text-2xl font-bold text-navy">Forgot your password?</h1>
     <p class="mt-1 text-sm text-muted">Enter your email and we will send you a reset link.</p>
 
-    <Message v-if="sent && demo" severity="warn" :closable="false" class="mt-5">Demo mode: no email was sent because no backend is connected.</Message>
-    <Message v-else-if="sent" severity="success" :closable="false" class="mt-5">If an account exists for that address, a reset link is on its way.</Message>
+    <Message v-if="sent" severity="success" :closable="false" class="mt-5">If an account exists for that address, a reset link is on its way.</Message>
     <Message v-if="formError" severity="error" :closable="false" class="mt-5" role="alert">{{ formError }}</Message>
 
     <form v-if="!sent" class="mt-6 space-y-4" novalidate @submit.prevent="submit">
