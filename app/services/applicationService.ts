@@ -3,16 +3,21 @@ import { SESSION_CAPACITY, usesSeat, type Booking } from '~/utils/sessions'
 import { api, ApiError } from './api'
 import { rows, toApplication } from './mappers'
 
-interface PresignedUpload { presigned_url: string; file_id: string; object_key: string }
+interface PresignedUpload { presigned_url: string; file_id: string }
 
-/** Upload one file: presigned URL -> PUT bytes to storage. Returns what confirm-upload needs. */
-async function uploadFile(type: DocumentType, file: File): Promise<{ fileId: string; objectKey: string; file: File }> {
+/**
+ * Upload one file: get a presigned URL, then PUT the bytes through the same-origin
+ * `/api/r2` proxy. Routing through the Nuxt server avoids the browser CORS preflight to
+ * R2, so the bucket needs no CORS policy. Returns what confirm-upload needs.
+ */
+async function uploadFile(type: DocumentType, file: File): Promise<{ fileId: string; file: File }> {
   const slot = await api<PresignedUpload>('/files/presigned-url', {
     method: 'POST', body: { file_name: file.name, file_type: type, file_size: file.size }
   })
-  const put = await fetch(slot.presigned_url, { method: 'PUT', body: file, headers: file.type ? { 'Content-Type': file.type } : {} })
+  const proxyUrl = `/api/r2?url=${encodeURIComponent(slot.presigned_url)}`
+  const put = await fetch(proxyUrl, { method: 'PUT', body: file, headers: file.type ? { 'Content-Type': file.type } : {} })
   if (!put.ok) throw new ApiError(`Could not upload ${file.name} (storage answered ${put.status}).`, put.status)
-  return { fileId: slot.file_id, objectKey: slot.object_key, file }
+  return { fileId: slot.file_id, file }
 }
 
 export const applicationService = {
@@ -45,11 +50,19 @@ export const applicationService = {
       })
   },
 
-  /** Uploads each document first, creates the application with their file ids, then confirms the uploads against it. */
+  /**
+   * Uploads each document, confirms it, then creates the application with the resulting
+   * file ids. Confirmation must happen before creation: the backend rejects `document_ids`
+   * that are not yet confirmed. The backend re-links the files to the application
+   * (source_table / source_table_id) on create, so confirm only needs `file_id`.
+   */
   async create(payload: NewApplicationPayload, files: Partial<Record<DocumentType, File>> = {}): Promise<Application> {
     const entries = Object.entries(files).filter((e): e is [DocumentType, File] => !!e[1])
     const uploaded = await Promise.all(entries.map(([type, file]) => uploadFile(type, file)))
-    const created = toApplication(await api('/applications', {
+    await Promise.all(uploaded.map(u => api('/files/confirm-upload', {
+      method: 'POST', body: { file_id: u.fileId }
+    })))
+    return toApplication(await api('/applications', {
       method: 'POST',
       body: {
         department: payload.department, specialization: payload.specialization, motivation: payload.motivation, experience: payload.experience,
@@ -57,14 +70,6 @@ export const applicationService = {
         duration_months: payload.durationMonths, work_mode: payload.workMode, document_ids: uploaded.map(u => u.fileId)
       }
     }))
-    await Promise.all(uploaded.map(u => api('/files/confirm-upload', {
-      method: 'POST',
-      body: {
-        file_id: u.fileId, object_key: u.objectKey, source_table: 'applications', source_table_id: created.id,
-        extra: { original_name: u.file.name, mime_type: u.file.type }
-      }
-    })))
-    return created
   },
 
   async updateStatus(id: string, payload: StatusUpdatePayload): Promise<Application> {
