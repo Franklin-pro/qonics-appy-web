@@ -4,11 +4,9 @@ import { z } from 'zod'
 import type { DocumentType, WorkMode, Application, SessionId } from '~/types/application'
 import type { DepartmentId } from '~/types/department'
 import { useApplicationsStore } from '~/stores/applications'
-import { useAuthStore } from '~/stores/auth'
 
 const emit = defineEmits<{ submitted: [application: Application] }>()
 
-const auth = useAuthStore()
 const applications = useApplicationsStore()
 const toast = useToast()
 
@@ -103,7 +101,7 @@ async function next() {
 const attached = computed(() => uploads.value.filter(u => files[u.type]))
 
 async function submit() {
-  if (!auth.user || !department.value || !specialization.value) return
+  if (!department.value || !specialization.value) return
   submitting.value = true
   submitError.value = ''
   try {
