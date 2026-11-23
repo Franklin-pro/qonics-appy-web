@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import type { Application } from '~/types/application'
 import { useSettingsStore } from '~/stores/settings'
+import { applicationService } from '~/services/applicationService'
 
 definePageMeta({ layout: 'default' })
 useHead({ title: 'Apply for Internship | Qonics Inc.' })
 
 const settings = useSettingsStore()
+const bookingStore = applicationService
 const done = ref<Application | null>(null)
 
 onMounted(async () => {
-  await settings.fetch()
+  await bookingStore.availability()
 })
-const ready = computed(() => settings.loaded)
+const ready = computed(() => bookingStore.availability)
 </script>
 
 <template>

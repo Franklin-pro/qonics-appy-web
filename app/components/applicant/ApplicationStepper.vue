@@ -10,6 +10,11 @@ const emit = defineEmits<{ submitted: [application: Application] }>()
 const applications = useApplicationsStore()
 const toast = useToast()
 
+// ── Auth detection ────────────────────────────────────────────────────────
+// Replace with however your app exposes the token (cookie, store, composable).
+const { store } = useAuth()
+const isAuthenticated = computed(() => store.isAuthenticated)
+
 const STEPS = ['Department', 'Specialization', 'Details', 'Documents', 'Review']
 const step = ref(1)
 const submitting = ref(false)
@@ -24,18 +29,44 @@ watch(department, () => { specialization.value = null })
 // Step 3 (VeeValidate + Zod)
 const today = new Date(new Date().setHours(0, 0, 0, 0))
 const { errors, defineField, meta, validate, values } = useForm({
-  validationSchema: zodSchema(z.object({
-    motivation: z.string().trim().min(50, 'Tell us a bit more (at least 50 characters)').max(1500, 'Keep it under 1500 characters'),
-    experience: z.string().trim().min(20, 'Describe your experience (at least 20 characters)').max(1500, 'Keep it under 1500 characters'),
-    educationLevel: z.enum(['university', 'high_school'], { error: 'Select your education level' }),
-    startDate: z.date({ error: 'Choose a session date' }).min(today, 'The date cannot be in the past')
-      .refine(d => d.getDay() !== 0 && d.getDay() !== 6, 'Sessions run Monday to Friday'),
-    session: z.enum(['morning', 'afternoon'], { error: 'Choose a session' }),
-    durationMonths: z.number({ error: 'Choose a duration' }),
-    workMode: z.enum(['onsite', 'remote', 'hybrid'], { error: 'Choose a work mode' })
-  })),
-  initialValues: { motivation: '', experience: '' }
+  validationSchema: zodSchema(
+    z.object({
+      motivation: z.string().trim().min(50, 'Tell us a bit more (at least 50 characters)').max(1500, 'Keep it under 1500 characters'),
+      experience: z.string().trim().min(20, 'Describe your experience (at least 20 characters)').max(1500, 'Keep it under 1500 characters'),
+      educationLevel: z.enum(['university', 'high_school'], { error: 'Select your education level' }),
+      startDate: z.date({ error: 'Choose a session date' }).min(today, 'The date cannot be in the past')
+        .refine(d => d.getDay() !== 0 && d.getDay() !== 6, 'Sessions run Monday to Friday'),
+      session: z.enum(['morning', 'afternoon'], { error: 'Choose a session' }),
+      durationMonths: z.number({ error: 'Choose a duration' }),
+      workMode: z.enum(['onsite', 'remote', 'hybrid'], { error: 'Choose a work mode' }),
+
+      // Guest identity fields — optional at the type level,
+      // required via superRefine only when there is no token.
+      fullName: z.string().trim().optional(),
+      email: z.string().trim().optional(),
+      phone: z.string().trim().optional(),
+    }).superRefine((v, ctx) => {
+      if (isAuthenticated.value) return
+      if (!v.fullName || v.fullName.length < 2) {
+        ctx.addIssue({ code: 'custom', path: ['fullName'], message: 'Enter your full name' })
+      }
+      if (!v.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) {
+        ctx.addIssue({ code: 'custom', path: ['email'], message: 'Enter a valid email address' })
+      }
+      if (!v.phone || v.phone.replace(/[^\d]/g, '').length < 6) {
+        ctx.addIssue({ code: 'custom', path: ['phone'], message: 'Enter a valid phone number' })
+      }
+    })
+  ),
+  initialValues: {
+    motivation: '',
+    experience: '',
+    fullName: '',
+    email: '',
+    phone: '',
+  },
 })
+
 const [motivation] = defineField('motivation')
 const [experience] = defineField('experience')
 const [educationLevel] = defineField('educationLevel')
@@ -43,6 +74,11 @@ const [startDate] = defineField('startDate')
 const [session] = defineField('session')
 const [durationMonths] = defineField('durationMonths')
 const [workMode] = defineField('workMode')
+// Guest fields
+const [fullName] = defineField('fullName')
+const [email] = defineField('email')
+const [phone] = defineField('phone')
+
 // Session capacity: at most SESSION_CAPACITY students per session per date.
 const availabilityError = ref('')
 const needsSeat = computed(() => usesSeat(workMode.value))
@@ -106,6 +142,16 @@ async function submit() {
   submitError.value = ''
   try {
     const v = values
+
+    // Guest identity fields — only sent when there is no token.
+    const guestFields = !isAuthenticated.value
+      ? {
+          fullName: v.fullName!.trim(),
+          email: v.email!.trim(),
+          phone: v.phone!.trim(),
+        }
+      : {}
+
     const app = await applications.create({
       department: department.value,
       specialization: specialization.value,
@@ -115,8 +161,10 @@ async function submit() {
       educationLevel: v.educationLevel!,
       session: v.session!,
       durationMonths: v.durationMonths!,
-      workMode: v.workMode!
+      workMode: v.workMode!,
+      ...guestFields,
     }, Object.fromEntries(attached.value.map(u => [u.type, files[u.type]!])))
+
     toast.add({
       severity: 'success', summary: 'Application submitted', detail: `Reference ${app.reference}`,
       life: 6000
@@ -178,6 +226,23 @@ async function submit() {
       <!-- 3 Details -->
       <StepPanel :value="3">
         <h2 class="mb-4 text-lg font-semibold text-navy">Application details</h2>
+
+        <!-- Guest identity (only when not authenticated) -->
+        <div v-if="!isAuthenticated" class="mb-6 rounded-xl border border-line bg-white p-4">
+          <p class="mb-3 text-sm font-medium text-navy">Your contact details</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <AppField id="fullName" label="Full name" :error="errors.fullName" required class="sm:col-span-2">
+              <InputText id="fullName" v-model="fullName" autocomplete="name" placeholder="Jane Doe" :invalid="!!errors.fullName" fluid />
+            </AppField>
+            <AppField id="email" label="Email" :error="errors.email" required>
+              <InputText id="email" v-model="email" type="email" autocomplete="email" placeholder="jane@example.com" :invalid="!!errors.email" fluid />
+            </AppField>
+            <AppField id="phone" label="Phone" :error="errors.phone" required>
+              <InputText id="phone" v-model="phone" type="tel" autocomplete="tel" placeholder="+1 555 123 4567" :invalid="!!errors.phone" fluid />
+            </AppField>
+          </div>
+        </div>
+
         <AppField id="education" label="Education level" :error="errors.educationLevel" required>
           <RadioButtonGroup v-model="educationLevel" name="education" class="grid gap-3 sm:grid-cols-2">
             <label
@@ -271,6 +336,17 @@ async function submit() {
           :duration-months="values.durationMonths ?? null" :work-mode="values.workMode ?? null"
           :motivation="values.motivation ?? ''" :experience="values.experience ?? ''"
         />
+
+        <!-- Guest contact summary -->
+        <div v-if="!isAuthenticated" class="mt-5">
+          <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Contact details</p>
+          <ul class="space-y-1 text-sm text-ink">
+            <li><i class="pi pi-user mr-1.5 text-ok" aria-hidden="true" />{{ values.fullName }}</li>
+            <li><i class="pi pi-envelope mr-1.5 text-ok" aria-hidden="true" />{{ values.email }}</li>
+            <li><i class="pi pi-phone mr-1.5 text-ok" aria-hidden="true" />{{ values.phone }}</li>
+          </ul>
+        </div>
+
         <div class="mt-5">
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Documents</p>
           <p v-if="!attached.length" class="text-sm text-muted">No documents attached.</p>
