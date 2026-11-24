@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { DocumentType, WorkMode, Application, SessionId } from '~/types/application'
 import type { DepartmentId } from '~/types/department'
 import { useApplicationsStore } from '~/stores/applications'
+import { applicantService } from '~/services/applicantService'
 
 const emit = defineEmits<{ submitted: [application: Application] }>()
 
@@ -23,6 +24,9 @@ const submitError = ref('')
 // Steps 1-2
 const department = ref<DepartmentId | null>(null)
 const specialization = ref<string | null>(null)
+const coursePrice = ref<{ price: number; currency: string } | null>(null)
+const priceLoading = ref(false)
+const priceError = ref('')
 const specializations = computed(() => getDepartment(department.value)?.specializations ?? [])
 watch(department, () => { specialization.value = null })
 
@@ -74,6 +78,20 @@ const [startDate] = defineField('startDate')
 const [session] = defineField('session')
 const [durationMonths] = defineField('durationMonths')
 const [workMode] = defineField('workMode')
+watch([department, specialization, durationMonths], async ([course, spec, months]) => {
+  coursePrice.value = null
+  priceError.value = ''
+  if (!course || !spec || !months) return
+  priceLoading.value = true
+  try {
+    const result = await applicantService.getCoursePrice(course, spec, months)
+    if (department.value === course && specialization.value === spec && durationMonths.value === months) coursePrice.value = result
+  } catch (e) {
+    priceError.value = (e as Error).message
+  } finally {
+    priceLoading.value = false
+  }
+})
 // Guest fields
 const [fullName] = defineField('fullName')
 const [email] = defineField('email')
@@ -91,21 +109,20 @@ const suggestions = computed(() => (slotFull.value && startDate.value && session
 const loadAvailability = async () => {
   try { availabilityError.value = ''; await applications.fetchAvailability() } catch (e) { availabilityError.value = (e as Error).message }
 }
-onMounted(loadAvailability)
+onMounted(async () => {
+  await loadAvailability()
+})
 function pickSuggestion(s: { date: Date; session: SessionId }) { startDate.value = s.date; session.value = s.session }
 const weekendDays = [0, 6]
 
 const durationOptions = [1,2,3, 4,5, 6].map(m => ({ label: `${m} months`, value: m }))
-// Software pricing: 40,000 for month one, then 35,000 per additional month
-// (so two months is 75,000). IoT is priced at 50,000 per month.
 const amount = computed(() => {
-  const months = durationMonths.value
-  if (!department.value || !months) return null
-  return department.value === 'software'
-    ? 40_000 + (months - 1) * 35_000
-    : months * 50_000
+  if (!coursePrice.value || !durationMonths.value) return null
+  return coursePrice.value.price
 })
-const formatAmount = (value: number | null) => value === null ? 'Select a cause and duration' : value.toLocaleString()
+const formatAmount = (value: number | null) => value === null
+  ? (priceLoading.value ? 'Loading course price…' : 'Select a course and duration')
+  : `${coursePrice.value?.currency ?? ''} ${value.toLocaleString()}`.trim()
 const modeOptions: Array<{ label: string; value: WorkMode }> = [
   { label: 'On-site', value: 'onsite' }, { label: 'Remote', value: 'remote' }, { label: 'Hybrid', value: 'hybrid' }
 ]
@@ -152,6 +169,8 @@ async function submit() {
   submitError.value = ''
   try {
     const v = values
+    const priceForCourse = await applicantService.getCoursePrice(department.value, specialization.value, v.durationMonths!)
+    coursePrice.value = priceForCourse
 
     // Guest identity fields — only sent when there is no token.
     const guestFields = !isAuthenticated.value
@@ -172,6 +191,8 @@ async function submit() {
       session: v.session!,
       durationMonths: v.durationMonths!,
       workMode: v.workMode!,
+      price: priceForCourse.price,
+      currency: priceForCourse.currency,
       ...guestFields,
     }, Object.fromEntries(attached.value.map(u => [u.type, files[u.type]!])))
 
@@ -279,9 +300,12 @@ async function submit() {
           </AppField>
         </div>
 
-        <AppField id="amount" label="Amount" hint="Calculated from the selected department and internship duration." class="mt-4">
+        <AppField id="amount" label="Amount" hint="Price set for the selected course, specialization, and duration." class="mt-4">
           <InputText id="amount" :model-value="formatAmount(amount)" readonly fluid />
         </AppField>
+        <Message v-if="priceError" severity="warn" size="small" :closable="false" class="mt-2">
+          Could not load the selected course price ({{ priceError }}).
+        </Message>
 
         <AppField id="session" label="Daily session time" :error="errors.session" hint="You attend Monday to Friday at this time."  class="mt-4" required>
           <RadioButtonGroup v-model="session" name="session" class="grid gap-3 sm:grid-cols-2">
@@ -302,6 +326,9 @@ async function submit() {
             </label>
           </RadioButtonGroup>
         </AppField>
+        <p v-if="session === 'morning'" class="mt-2 text-sm text-muted">
+          The price for the morning session includes a café break.
+        </p>
         <Message v-if="availabilityError" severity="warn" size="small" :closable="false" class="mt-3">
           Could not check seat availability ({{ availabilityError }}).
           <Button label="Retry" size="small" text @click="loadAvailability" />

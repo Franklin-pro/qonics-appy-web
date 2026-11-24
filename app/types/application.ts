@@ -63,6 +63,8 @@ export interface NewApplicationPayload {
   session: SessionId
   durationMonths: number
   workMode: WorkMode
+  price: number
+  currency: string
   /** Required for guest submissions; omitted for signed-in applicants. */
   fullName?: string
   email?: string
