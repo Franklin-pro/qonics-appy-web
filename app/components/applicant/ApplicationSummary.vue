@@ -10,6 +10,7 @@ defineProps<{
   educationLevel: EducationLevel | null
   session: SessionId | null
   durationMonths: number | null
+  amount?: number | null
   workMode: WorkMode | null
   motivation: string
   experience: string
@@ -27,6 +28,7 @@ const MODE_LABEL: Record<WorkMode, string> = { onsite: 'On-site', remote: 'Remot
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted">Daily session</dt><dd class="mt-0.5 text-sm text-ink">{{ sessionLabel(session) }}</dd></div>
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted">Education level</dt><dd class="mt-0.5 text-sm text-ink">{{ educationLabel(educationLevel) }}</dd></div>
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted">Duration</dt><dd class="mt-0.5 text-sm text-ink">{{ durationMonths ? `${durationMonths} months` : '—' }}</dd></div>
+      <div><dt class="text-xs font-medium uppercase tracking-wide text-muted">Amount</dt><dd class="mt-0.5 text-sm font-semibold text-ink">{{ amount == null ? '—' : amount.toLocaleString() }}</dd></div>
       <div><dt class="text-xs font-medium uppercase tracking-wide text-muted">Work mode</dt><dd class="mt-0.5 text-sm text-ink">{{ workMode ? MODE_LABEL[workMode] : '—' }}</dd></div>
     </dl>
     <div><p class="text-xs font-medium uppercase tracking-wide text-muted">Motivation</p><p class="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink">{{ motivation }}</p></div>

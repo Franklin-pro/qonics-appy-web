@@ -96,6 +96,16 @@ function pickSuggestion(s: { date: Date; session: SessionId }) { startDate.value
 const weekendDays = [0, 6]
 
 const durationOptions = [1,2,3, 4,5, 6].map(m => ({ label: `${m} months`, value: m }))
+// Software pricing: 40,000 for month one, then 35,000 per additional month
+// (so two months is 75,000). IoT is priced at 50,000 per month.
+const amount = computed(() => {
+  const months = durationMonths.value
+  if (!department.value || !months) return null
+  return department.value === 'software'
+    ? 40_000 + (months - 1) * 35_000
+    : months * 50_000
+})
+const formatAmount = (value: number | null) => value === null ? 'Select a cause and duration' : value.toLocaleString()
 const modeOptions: Array<{ label: string; value: WorkMode }> = [
   { label: 'On-site', value: 'onsite' }, { label: 'Remote', value: 'remote' }, { label: 'Hybrid', value: 'hybrid' }
 ]
@@ -269,6 +279,10 @@ async function submit() {
           </AppField>
         </div>
 
+        <AppField id="amount" label="Amount" hint="Calculated from the selected department and internship duration." class="mt-4">
+          <InputText id="amount" :model-value="formatAmount(amount)" readonly fluid />
+        </AppField>
+
         <AppField id="session" label="Daily session time" :error="errors.session" hint="You attend Monday to Friday at this time."  class="mt-4" required>
           <RadioButtonGroup v-model="session" name="session" class="grid gap-3 sm:grid-cols-2">
             <label
@@ -334,6 +348,7 @@ async function submit() {
           :department="department" :specialization="specialization" :start-date="values.startDate ?? null"
           :education-level="values.educationLevel ?? null" :session="values.session ?? null"
           :duration-months="values.durationMonths ?? null" :work-mode="values.workMode ?? null"
+          :amount="amount"
           :motivation="values.motivation ?? ''" :experience="values.experience ?? ''"
         />
 
