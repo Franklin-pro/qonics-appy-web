@@ -41,6 +41,8 @@ const steps = [
       </div>
     </section>
 
+    <!-- <TrainingPackages /> -->
+
     <section class="container-x py-20" aria-labelledby="how">
       <p class="eyebrow">How to apply</p>
       <h2 id="how" class="h-section mt-2">Four simple steps</h2>

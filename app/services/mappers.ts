@@ -1,3 +1,4 @@
+import type { TrainingModule, TrainingPackage } from '~/types/training'
 import type { Application, ApplicationDocument, AppNotification, AppSettings, DocumentType, ReviewNote, StatusEvent } from '~/types/application'
 import type { ApplicantProfile, ApplicantSummary, Session, User } from '~/types/user'
 
@@ -48,6 +49,9 @@ export function toApplication(r: Raw): Application {
     : toProfile({ id: r.applicant_id ?? r.user_id, full_name: r.full_name ?? r.applicant_name, email: r.email ?? r.applicant_email, phone: r.phone })
   return {
     id: String(r.id), reference: str(r.reference), applicant, department: r.department, specialization: str(r.specialization),
+    packageId: r.package_id ?? null, packageName: str(r.package_name) || null,
+    skills: Array.isArray(r.skills) ? r.skills.map(String) : [],
+    amount: r.amount == null ? null : Number(r.amount),
     motivation: str(r.motivation), experience: str(r.experience), startDate: r.start_date ?? null, educationLevel: r.education_level,
     session: r.session, durationMonths: Number(r.duration_months), workMode: r.work_mode, status: r.status, submittedAt: str(r.submitted_at),
     interviewAt: r.interview_at ?? null,
@@ -80,4 +84,20 @@ export function totalOf(data: unknown): number | undefined {
   const d = data as Raw
   const n = d.total ?? d.total_count ?? d.pagination?.total ?? d.meta?.total
   return typeof n === 'number' ? n : undefined
+}
+
+export function toTrainingModule(r: Raw | string): TrainingModule {
+  if (typeof r === 'string') return { id: r, name: r }
+  return { id: String(r.id ?? r.name), name: str(r.name ?? r.title) }
+}
+
+export function toTrainingPackage(r: Raw): TrainingPackage {
+  return {
+    id: r.id, name: str(r.name), slug: str(r.slug), description: str(r.description),
+    price: Math.trunc(Number(r.price)) || 0, currency: str(r.currency) || 'RWF', duration: str(r.duration ?? r.period) || null,
+    // The API sends `skills` as plain strings (e.g. "3d-printing"); older shape used `modules`.
+    modules: [r.skills, r.modules].find(Array.isArray)?.map(toTrainingModule) ?? [],
+    recommended: !!(r.recommended ?? r.is_recommended), active: !!(r.active ?? r.is_active ?? true),
+    displayOrder: Number(r.display_order ?? r.displayOrder ?? 0) || 0
+  }
 }
