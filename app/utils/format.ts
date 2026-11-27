@@ -28,3 +28,9 @@ export function timeAgo(value: string) {
 export function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('')
 }
+
+/** "150,000 RWF". Prices are whole currency units (integers): no floating-point arithmetic is done on them. */
+export function formatPrice(amount: number, currency: string) {
+  const whole = Number.isFinite(amount) ? Math.trunc(amount) : 0
+  return `${whole.toLocaleString('en-US')} ${currency}`.trim()
+}

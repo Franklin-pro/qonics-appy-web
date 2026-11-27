@@ -89,9 +89,10 @@ export const applicationService = {
     return toApplication(await api('/applications', {
       method: 'POST',
       body: {
-        department: payload.department, specialization: payload.specialization, motivation: payload.motivation, experience: payload.experience,
+        department: payload.department, specialization: payload.specialization, package_id: payload.packageId, motivation: payload.motivation, experience: payload.experience,
         start_date: payload.startDate, education_level: payload.educationLevel, session: payload.session,
         duration_months: payload.durationMonths, work_mode: payload.workMode, document_ids: uploaded.map(u => u.fileId),
+        price: payload.price, currency: payload.currency,
         ...(isGuest ? {
           full_name: payload.fullName, email: payload.email, phone: payload.phone,
           ...(guestToken ? { guest_token: guestToken } : {})

@@ -4,6 +4,9 @@ import { z } from 'zod'
 import type { DocumentType, WorkMode, Application, SessionId } from '~/types/application'
 import type { DepartmentId } from '~/types/department'
 import { useApplicationsStore } from '~/stores/applications'
+import { applicantService } from '~/services/applicantService'
+import { trainingService } from '~/services/trainingService'
+import type { TrainingPackage } from '~/types/training'
 
 const emit = defineEmits<{ submitted: [application: Application] }>()
 
@@ -16,13 +19,19 @@ const { store } = useAuth()
 const isAuthenticated = computed(() => store.isAuthenticated)
 
 const STEPS = ['Department', 'Specialization', 'Details', 'Documents', 'Review']
-const step = ref(1)
+// Applying through a training package (?package=ID) replaces the department/specialization steps.
+const hasPackage = !!useRoute().query.package
+const FIRST_STEP = hasPackage ? 3 : 1
+const step = ref(FIRST_STEP)
 const submitting = ref(false)
 const submitError = ref('')
 
 // Steps 1-2
 const department = ref<DepartmentId | null>(null)
 const specialization = ref<string | null>(null)
+const coursePrice = ref<{ price: number; currency: string } | null>(null)
+const priceLoading = ref(false)
+const priceError = ref('')
 const specializations = computed(() => getDepartment(department.value)?.specializations ?? [])
 watch(department, () => { specialization.value = null })
 
@@ -74,6 +83,41 @@ const [startDate] = defineField('startDate')
 const [session] = defineField('session')
 const [durationMonths] = defineField('durationMonths')
 const [workMode] = defineField('workMode')
+// Training package chosen on /training (?package=ID): its monthly price × duration is the amount to pay.
+const route = useRoute()
+const trainingPackage = ref<TrainingPackage | null>(null)
+const packageError = ref('')
+onMounted(async () => {
+  const id = route.query.package
+  if (!id) return
+  try {
+    const list = await trainingService.getTrainingPackages()
+    trainingPackage.value = list.find(p => String(p.id) === String(id)) ?? null
+    if (!trainingPackage.value) packageError.value = 'The selected training package is no longer available.'
+  } catch (e) {
+    packageError.value = (e as Error).message
+  }
+})
+const packageTotal = (months: number) => ({ price: trainingPackage.value!.price * months, currency: trainingPackage.value!.currency })
+
+watch([department, specialization, durationMonths, trainingPackage], async ([course, spec, months]) => {
+  coursePrice.value = null
+  priceError.value = ''
+  if (trainingPackage.value) {
+    if (months) coursePrice.value = packageTotal(months)
+    return
+  }
+  if (!course || !spec || !months) return
+  priceLoading.value = true
+  try {
+    const result = await applicantService.getCoursePrice(course, spec, months)
+    if (department.value === course && specialization.value === spec && durationMonths.value === months) coursePrice.value = result
+  } catch (e) {
+    priceError.value = (e as Error).message
+  } finally {
+    priceLoading.value = false
+  }
+})
 // Guest fields
 const [fullName] = defineField('fullName')
 const [email] = defineField('email')
@@ -91,11 +135,20 @@ const suggestions = computed(() => (slotFull.value && startDate.value && session
 const loadAvailability = async () => {
   try { availabilityError.value = ''; await applications.fetchAvailability() } catch (e) { availabilityError.value = (e as Error).message }
 }
-onMounted(loadAvailability)
+onMounted(async () => {
+  await loadAvailability()
+})
 function pickSuggestion(s: { date: Date; session: SessionId }) { startDate.value = s.date; session.value = s.session }
 const weekendDays = [0, 6]
 
 const durationOptions = [1,2,3, 4,5, 6].map(m => ({ label: `${m} months`, value: m }))
+const amount = computed(() => {
+  if (!coursePrice.value || !durationMonths.value) return null
+  return coursePrice.value.price
+})
+const formatAmount = (value: number | null) => value === null
+  ? (priceLoading.value ? 'Loading course price…' : 'Select a course and duration')
+  : `${coursePrice.value?.currency ?? ''} ${value.toLocaleString()}`.trim()
 const modeOptions: Array<{ label: string; value: WorkMode }> = [
   { label: 'On-site', value: 'onsite' }, { label: 'Remote', value: 'remote' }, { label: 'Hybrid', value: 'hybrid' }
 ]
@@ -118,8 +171,8 @@ watch(isUniversity, (uni) => {
 })
 
 const valid = computed(() => [
-  !!department.value,
-  !!specialization.value,
+  hasPackage || !!department.value,
+  hasPackage || !!specialization.value,
   meta.value.valid && !slotFull.value,
   !isUniversity.value || !!files.transcript
 ])
@@ -137,11 +190,15 @@ async function next() {
 const attached = computed(() => uploads.value.filter(u => files[u.type]))
 
 async function submit() {
-  if (!department.value || !specialization.value) return
+  if (hasPackage ? !trainingPackage.value : (!department.value || !specialization.value)) return
   submitting.value = true
   submitError.value = ''
   try {
     const v = values
+    const priceForCourse = trainingPackage.value
+      ? packageTotal(v.durationMonths!)
+      : await applicantService.getCoursePrice(department.value!, specialization.value!, v.durationMonths!)
+    coursePrice.value = priceForCourse
 
     // Guest identity fields — only sent when there is no token.
     const guestFields = !isAuthenticated.value
@@ -153,8 +210,9 @@ async function submit() {
       : {}
 
     const app = await applications.create({
-      department: department.value,
-      specialization: specialization.value,
+      ...(trainingPackage.value
+        ? { packageId: trainingPackage.value.id }
+        : { department: department.value!, specialization: specialization.value! }),
       motivation: v.motivation!.trim(),
       experience: v.experience!.trim(),
       startDate: v.startDate ? new Date(v.startDate).toISOString() : null,
@@ -162,6 +220,8 @@ async function submit() {
       session: v.session!,
       durationMonths: v.durationMonths!,
       workMode: v.workMode!,
+      price: priceForCourse.price,
+      currency: priceForCourse.currency,
       ...guestFields,
     }, Object.fromEntries(attached.value.map(u => [u.type, files[u.type]!])))
 
@@ -180,9 +240,24 @@ async function submit() {
 </script>
 
 <template>
+  <div v-if="trainingPackage" class="mb-5 rounded-xl border border-brand/30 bg-primary-50 p-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-brand">Selected training package</p>
+    <p class="mt-1 text-base font-semibold text-navy">{{ trainingPackage.name }}</p>
+    <p v-if="trainingPackage.description" class="text-sm text-muted">{{ trainingPackage.description }}</p>
+    <p class="mt-2 text-sm text-ink">
+      <strong>{{ trainingPackage.price.toLocaleString('en-US') }} {{ trainingPackage.currency }}</strong> per month — the amount to pay is this price × your chosen duration.
+    </p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <Tag v-for="m in trainingPackage.modules" :key="m.id" :value="m.name" severity="success" />
+    </div>
+  </div>
+  <div v-else-if="hasPackage && !packageError" class="mb-5"><Skeleton height="5rem" /></div>
+  <Message v-else-if="packageError" severity="warn" :closable="false" class="mb-4">{{ packageError }}</Message>
   <Stepper v-model:value="step" linear>
     <StepList class="overflow-x-auto">
-      <Step v-for="(label, i) in STEPS" :key="label" :value="i + 1" :disabled="!canOpen(i + 1)">{{ label }}</Step>
+      <template v-for="(label, i) in STEPS" :key="label">
+        <Step v-if="i + 1 >= FIRST_STEP" :value="i + 1" :disabled="!canOpen(i + 1)">{{ label }}</Step>
+      </template>
     </StepList>
     <StepPanels>
       <!-- 1 Department -->
@@ -269,6 +344,13 @@ async function submit() {
           </AppField>
         </div>
 
+        <AppField id="amount" label="Amount" hint="Price set for the selected course, specialization, and duration." class="mt-4">
+          <InputText id="amount" :model-value="formatAmount(amount)" readonly fluid />
+        </AppField>
+        <Message v-if="priceError" severity="warn" size="small" :closable="false" class="mt-2">
+          Could not load the selected course price ({{ priceError }}).
+        </Message>
+
         <AppField id="session" label="Daily session time" :error="errors.session" hint="You attend Monday to Friday at this time."  class="mt-4" required>
           <RadioButtonGroup v-model="session" name="session" class="grid gap-3 sm:grid-cols-2">
             <label
@@ -288,6 +370,9 @@ async function submit() {
             </label>
           </RadioButtonGroup>
         </AppField>
+        <p v-if="session === 'morning'" class="mt-2 text-sm text-muted">
+          The price for the morning session includes a café break.
+        </p>
         <Message v-if="availabilityError" severity="warn" size="small" :closable="false" class="mt-3">
           Could not check seat availability ({{ availabilityError }}).
           <Button label="Retry" size="small" text @click="loadAvailability" />
@@ -331,9 +416,11 @@ async function submit() {
       <StepPanel :value="5">
         <h2 class="mb-4 text-lg font-semibold text-navy">Review and submit</h2>
         <ApplicationSummary
-          :department="department" :specialization="specialization" :start-date="values.startDate ?? null"
+          :department="department" :specialization="specialization"
+          :package-name="trainingPackage?.name" :package-skills="trainingPackage?.modules.map(m => m.name)" :start-date="values.startDate ?? null"
           :education-level="values.educationLevel ?? null" :session="values.session ?? null"
           :duration-months="values.durationMonths ?? null" :work-mode="values.workMode ?? null"
+          :amount="amount"
           :motivation="values.motivation ?? ''" :experience="values.experience ?? ''"
         />
 
@@ -359,7 +446,7 @@ async function submit() {
     </StepPanels>
 
     <div class="mt-6 flex items-center justify-between border-t border-line pt-4">
-      <Button label="Back" icon="pi pi-arrow-left" severity="secondary" text :disabled="step === 1 || submitting" @click="step--" />
+      <Button label="Back" icon="pi pi-arrow-left" severity="secondary" text :disabled="step === FIRST_STEP || submitting" @click="step--" />
       <Button v-if="step < 5" label="Next" icon="pi pi-arrow-right" severity="success" icon-pos="right" :disabled="step !== 3 && !valid[step - 1]" @click="next" />
       <Button v-else label="Submit application" icon="pi pi-send" severity="success" :loading="submitting" @click="submit" />
     </div>

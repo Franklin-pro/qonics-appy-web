@@ -65,6 +65,9 @@ select:focus-visible,
   .surface-card {
     @apply rounded-xl border border-line bg-white shadow-card;
   }
+  .card-lift {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:border-accent/40 hover:shadow-xl hover:shadow-navy/10;
+  }
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-widest text-brand;
   }
@@ -97,4 +100,50 @@ select:focus-visible,
 }
 .q-table .p-paginator {
   @apply border-t border-line;
+}
+
+/* ---- Motion ---- */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(25 166 87 / 0.5); }
+  100% { box-shadow: 0 0 0 8px rgb(25 166 87 / 0); }
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.anim-float { animation: float-y 6s ease-in-out infinite; }
+.anim-float-slow { animation: float-y 8s ease-in-out 1s infinite; }
+.anim-fade-up { animation: fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
+.anim-blink { animation: blink 1s steps(1) infinite; }
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(16 36 58 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(16 36 58 / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 75%);
+}
+.text-gradient {
+  background-image: linear-gradient(120deg, var(--color-brand), var(--color-accent) 60%, #34d399);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

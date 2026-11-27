@@ -58,7 +58,7 @@ const links = computed(() => [
         <TabPanels>
           <TabPanel value="overview">
             <ApplicationSummary
-              :department="app.department" :specialization="app.specialization" :start-date="app.startDate" :education-level="app.educationLevel" :session="app.session"
+              :department="app.department" :specialization="app.specialization" :package-name="app.packageName" :package-skills="app.skills" :amount="app.amount" :start-date="app.startDate" :education-level="app.educationLevel" :session="app.session"
               :duration-months="app.durationMonths" :work-mode="app.workMode" :motivation="app.motivation" :experience="app.experience"
             />
             <p v-if="app.interviewAt" class="mt-4 rounded-lg bg-primary-50 p-3 text-sm text-primary-700">

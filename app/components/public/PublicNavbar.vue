@@ -9,8 +9,9 @@ watch(() => route.fullPath, () => { open.value = false })
 const links = [
   { label: 'Home', to: '/' },
   { label: 'About Us', to: '/about' },
-  { label: 'Internship Opportunities', to: '/opportunities' },
-  { label: 'Departments', to: '/#departments' },
+  // { label: 'Internship Opportunities', to: '/opportunities' },
+  // { label: 'Departments', to: '/#departments' },
+  { label: 'Packages', to: '/packages' },
   { label: 'FAQ', to: '/faq' },
   { label: 'Contact', to: '/contact' }
 ]

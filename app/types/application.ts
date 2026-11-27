@@ -38,6 +38,13 @@ export interface Application {
   applicant: ApplicantProfile
   department: DepartmentId
   specialization: string
+  /** Set when the application was made through a training package. */
+  packageId?: string | number | null
+  packageName?: string | null
+  /** What the package covers, e.g. ["coding", "design"]. */
+  skills: string[]
+  /** Total amount to pay (whole currency units). */
+  amount: number | null
   motivation: string
   experience: string
   startDate: string | null
@@ -54,8 +61,11 @@ export interface Application {
 }
 
 export interface NewApplicationPayload {
-  department: DepartmentId
-  specialization: string
+  /** Set for course applications; omitted when applying through a training package. */
+  department?: DepartmentId
+  specialization?: string
+  /** Training package being applied for (replaces department/specialization). */
+  packageId?: string | number
   motivation: string
   experience: string
   startDate: string | null
@@ -63,6 +73,8 @@ export interface NewApplicationPayload {
   session: SessionId
   durationMonths: number
   workMode: WorkMode
+  price: number
+  currency: string
   /** Required for guest submissions; omitted for signed-in applicants. */
   fullName?: string
   email?: string
