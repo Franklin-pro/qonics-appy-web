@@ -5,8 +5,8 @@ defineProps<{ department: Department }>()
 </script>
 
 <template>
-  <article class="surface-card flex h-full flex-col p-6 transition-shadow hover:shadow-lg">
-    <span class="flex size-12 items-center justify-center rounded-xl bg-navy text-accent">
+  <article class="surface-card card-lift group flex h-full flex-col p-6">
+    <span class="flex size-12 items-center justify-center rounded-xl bg-navy text-accent transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110">
       <i :class="department.icon" class="text-xl" aria-hidden="true" />
     </span>
     <h3 class="mt-4 text-xl font-bold text-navy">{{ department.name }}</h3>
@@ -18,7 +18,7 @@ defineProps<{ department: Department }>()
       </li>
     </ul>
     <div class="mt-auto pt-6">
-      <LinkButton to="/applicant/apply" label="Apply to this department" icon="pi pi-arrow-right" icon-pos="right" text size="small" class="!px-0" />
+      <LinkButton to="/applicant/apply" label="Apply to this department" icon="pi pi-arrow-right" icon-pos="right" text size="small" class="!px-0 transition-transform group-hover:translate-x-1" />
     </div>
   </article>
 </template>
